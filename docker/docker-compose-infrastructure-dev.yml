@@ -1,0 +1,20 @@
+﻿name: picpay-backend-services
+
+services:
+  mongo-db:
+    image: bitnami/mongodb
+    container_name: picpay-backend-mongo-db
+    restart: unless-stopped
+    environment:
+     - ALLOW_EMPTY_PASSWORD=yes
+     - MONGODB_DATABASE=picpay-backend
+     - MONGODB_PORT_NUMBER=27017
+    ports:
+      - "27017:27017"
+    networks:
+        - infrastructure
+
+networks:
+  infrastructure:
+    name: infrastructure
+    driver: bridge
