@@ -5,7 +5,7 @@ import br.com.picpay.backend.data.dtos.TransferResult;
 import br.com.picpay.backend.data.enums.KnownCurrencyOperations;
 import br.com.picpay.backend.data.enums.TransferKnownStates;
 import br.com.picpay.backend.exceptions.base.TransferException;
-import br.com.picpay.backend.data.mongo.repositories.UserRepository;
+import br.com.picpay.backend.data.repositories.UserRepository;
 import lombok.RequiredArgsConstructor;
 import net.xyzsd.dichotomy.Maybe;
 import net.xyzsd.dichotomy.Result;
@@ -62,10 +62,16 @@ public class TransferService {
             // No need to check for both users existence since this method is only intended to
             // be called if all previous checks on transfer currency method passes (including user checks)
             Result.from(Optional.ofNullable(userRepository.findByUserId(transferInformation.payer())))
-                    .consume(userDocument -> userDocument.setCurrencyAmount(transferInformation.value()));
+                    .consume(user -> {
+                        user.setCurrencyAmount(user.getCurrencyAmount() - transferInformation.value());
+                        userRepository.save(user);
+                    });
 
             Result.from(Optional.ofNullable(userRepository.findByUserId(transferInformation.payee())))
-                    .consume(userDocument -> userDocument.setCurrencyAmount(userDocument.getCurrencyAmount() + transferInformation.value()));
+                    .consume(user -> {
+                        user.setCurrencyAmount(user.getCurrencyAmount() + transferInformation.value());
+                        userRepository.save(user);
+                    });
 
             result =  Result.ofOK(new TransferResult(transferInformation, TransferKnownStates.Completed));
         }
