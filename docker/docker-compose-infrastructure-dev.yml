@@ -13,7 +13,6 @@ services:
     restart: on-failure
     networks:
       - infrastructure
-      -
   pgadmin:
     container_name: pgadmin
     image: dpage/pgadmin4:latest
