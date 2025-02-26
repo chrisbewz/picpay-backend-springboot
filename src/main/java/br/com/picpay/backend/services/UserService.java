@@ -1,16 +1,12 @@
 package br.com.picpay.backend.services;
 
-import br.com.picpay.backend.data.dtos.CreateUserDto;
 import br.com.picpay.backend.data.enums.KnownCurrencyOperations;
 import br.com.picpay.backend.data.enums.UserKnownTypes;
-import br.com.picpay.backend.data.mongo.documents.UserDocument;
-import br.com.picpay.backend.data.mongo.repositories.UserRepository;
+import br.com.picpay.backend.data.repositories.UserRepository;
 import br.com.picpay.backend.exceptions.base.CustomException;
 import br.com.picpay.backend.exceptions.base.TransferException;
-import br.com.picpay.backend.exceptions.custom.UserAlreadyExistsException;
 import lombok.RequiredArgsConstructor;
 import net.xyzsd.dichotomy.Result;
-import net.xyzsd.dichotomy.trying.Try;
 import org.springframework.stereotype.Service;
 
 import java.util.EnumMap;
