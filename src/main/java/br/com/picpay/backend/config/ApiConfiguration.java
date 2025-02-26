@@ -7,7 +7,7 @@ import org.springframework.context.annotation.Import;
 @Configuration
 @Import({
         ApiErrorHandler.class,
-        MongoConfiguration.class
+        HibernateConfig.class
 })
 public class ApiConfiguration {
 }
