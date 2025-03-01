@@ -80,7 +80,7 @@ mvn picpay-backend-application:run
 
 If you like my work, feel free to:
 
-⭐ this repository. And we will be happy together :)
+⭐ this repository.
 Thanks a bunch for supporting me!
 
 
