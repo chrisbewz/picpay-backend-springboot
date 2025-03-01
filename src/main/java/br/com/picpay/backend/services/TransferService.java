@@ -29,20 +29,23 @@ public class TransferService {
 
         // Validate both users existence on database
         if(!maybeSourceUser.hasSome() || !maybeDestinationUse.hasSome())
-            return Result.ofErr(new TransferException("Invalid user provided",transferInformation));
+            return Result.ofErr(new TransferException(
+                    "Invalid user provided",
+                    TransferKnownStates.NonExistentUserId,
+                    transferInformation));
 
         // Validate if both user types can accept transfers between them
         if(userService.IsTransferEnabled(maybeSourceUser.expect().getUserType(), maybeDestinationUse.expect().getUserType(), KnownCurrencyOperations.Payment).isErr())
             return Result.ofErr(new TransferException(
                     "Transfer is not enabled for provided user types",
-                    TransferKnownStates.Faulted,
+                    TransferKnownStates.InvalidUserKnownTypes,
                     transferInformation));
 
         // TODO: Validate transfer source user currency value
         if(!Result.from(Optional.of(this.ValidateTransferCurrencyAmount(transferInformation))).isOK())
             return Result.ofErr(new TransferException(
                     "Transfer source user do not have the required value on account to complete the transfer",
-                    TransferKnownStates.Faulted,
+                    TransferKnownStates.InsufficientFunds,
                     transferInformation));
 
         // Update users account currency total amounts
