@@ -20,6 +20,12 @@ public class TransferException extends CustomException{
         this.transferState = TransferKnownStates.Faulted;
     }
 
+    public TransferException(Throwable cause) {
+        super(cause);
+        this.transferInformation = Optional.empty();
+        this.transferState = TransferKnownStates.Faulted;
+    }
+
     public TransferException(String message, TransferInformation transferInformation) {
         super(message);
         this.transferInformation = Optional.of(transferInformation);
@@ -38,9 +44,17 @@ public class TransferException extends CustomException{
         this.transferState = transferState;
     }
 
-    public TransferException(String message, HttpStatus status, TransferInformation transferInformation, TransferKnownStates transferState) {
+    public TransferException(String message, HttpStatus status, TransferKnownStates transferState, TransferInformation transferInformation) {
         super(message, status);
         this.transferInformation = Optional.of(transferInformation);
         this.transferState = transferState;
     }
+
+    public TransferException(String message, HttpStatus status, TransferKnownStates transferState, TransferInformation transferInformation, Throwable cause) {
+        super(message, status, cause);
+        this.transferInformation = Optional.of(transferInformation);
+        this.transferState = transferState;
+    }
+
+
 }
