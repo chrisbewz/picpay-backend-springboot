@@ -15,8 +15,12 @@ import net.xyzsd.dichotomy.trying.Try;
 import org.jetbrains.annotations.NotNull;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicReference;
+
+import static org.springframework.transaction.annotation.Propagation.REQUIRES_NEW;
 
 
 @Service
@@ -128,7 +132,9 @@ public class TransferService {
         return resultAmount > 0;
     }
 
-    private @NotNull Result<TransferResult, TransferErrorResult> MaterializeTransfer(TransferInformation transferInformation)
+
+    @Transactional(propagation = REQUIRES_NEW)
+    protected Result<TransferResult, TransferErrorResult> MaterializeTransfer(TransferInformation transferInformation)
     {
         Result<TransferResult, TransferErrorResult> result = null;
         try{
@@ -147,13 +153,14 @@ public class TransferService {
                     });
 
             result =  Result.ofOK(new TransferResult(transferInformation, TransferKnownStates.Completed));
-
-            // Notify destination user about transfer conclusion
-            this.notificationService.notifyTransfer(userService.findByUserId(transferInformation.payee()));
         }
         catch (Exception e){
             result = Result.ofErr(new TransferErrorResult(transferInformation,new TransferException(e.getMessage(), TransferKnownStates.Canceled, transferInformation)));
         }
+
+        if(result.isOK())
+            // Notify destination user about transfer conclusion
+            this.notificationService.notifyTransfer(userService.findByUserId(transferInformation.payee()));
 
         return result;
     }
