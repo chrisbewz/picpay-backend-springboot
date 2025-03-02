@@ -23,6 +23,6 @@ public class TestContainersConfiguration {
                 .withUsername(username)
                 .withPassword(password)
                 .withExposedPorts(5432)
-                .withReuse(true);
+                .withReuse(false);
     }
 }

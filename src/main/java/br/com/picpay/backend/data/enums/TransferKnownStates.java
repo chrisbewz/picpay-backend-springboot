@@ -14,7 +14,9 @@ public enum TransferKnownStates {
     Faulted(false),
     InsufficientFunds(false),
     InvalidUserKnownTypes(false),
-    InvalidUserInformation(false);
+    InvalidUserInformation(false),
+
+    UnauthorizedUser(false);
 
     private final boolean isSuccess;
 

@@ -2,6 +2,7 @@ package br.com.picpay.backend.exceptions;
 
 import br.com.picpay.backend.exceptions.base.BadRequestException;
 import br.com.picpay.backend.exceptions.base.CustomException;
+import br.com.picpay.backend.exceptions.base.NotAuthorizedException;
 import br.com.picpay.backend.exceptions.base.NotFoundException;
 import jakarta.validation.ValidationException;
 import org.springframework.http.HttpStatus;
@@ -25,6 +26,12 @@ public class ApiErrorHandler extends ResponseEntityExceptionHandler {
         }
 
         ExceptionDetails details = switch (ex) {
+
+            case NotAuthorizedException authEx -> new ExceptionDetails(
+                    authEx.getMessage(),
+                    authEx.getClass().getSimpleName(),
+                    HttpStatus.UNAUTHORIZED
+            );
 
             case ValidationException validationEx -> new ExceptionDetails(
                     validationEx.getMessage(),

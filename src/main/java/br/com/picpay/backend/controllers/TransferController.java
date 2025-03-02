@@ -3,8 +3,6 @@ package br.com.picpay.backend.controllers;
 import br.com.picpay.backend.data.dtos.TransferErrorResult;
 import br.com.picpay.backend.data.dtos.TransferInformation;
 import br.com.picpay.backend.data.dtos.TransferResult;
-import br.com.picpay.backend.exceptions.base.CustomException;
-import br.com.picpay.backend.exceptions.base.TransferException;
 import br.com.picpay.backend.services.TransferService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -13,7 +11,6 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
-import org.testng.annotations.Test;
 
 @RestController
 @RequiredArgsConstructor

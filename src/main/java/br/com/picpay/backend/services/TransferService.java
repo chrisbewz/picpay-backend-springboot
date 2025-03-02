@@ -6,8 +6,8 @@ import br.com.picpay.backend.data.dtos.TransferResult;
 import br.com.picpay.backend.data.entities.User;
 import br.com.picpay.backend.data.enums.KnownCurrencyOperations;
 import br.com.picpay.backend.data.enums.TransferKnownStates;
-import br.com.picpay.backend.exceptions.base.CustomException;
 import br.com.picpay.backend.exceptions.base.TransferException;
+import br.com.picpay.backend.exceptions.base.NotAuthorizedException;
 import br.com.picpay.backend.exceptions.custom.UserNotFoundException;
 import lombok.RequiredArgsConstructor;
 import net.xyzsd.dichotomy.Maybe;
@@ -25,6 +25,8 @@ import java.util.concurrent.atomic.AtomicReference;
 public class TransferService {
 
     private final UserService userService;
+
+    private final AuthorizationService authorizationService;
 
     private Result<User, Throwable> fetchUserTask(Long userId) {
         var task = Try.wrap(() -> Maybe.of(userService.findByUserId(userId)));
@@ -48,29 +50,11 @@ public class TransferService {
         var maybeSourceUser = fetchUserTask(transferInformation.payer());
         var maybeDestinationUse  = fetchUserTask(transferInformation.payee());
 
-
         // Validate both users existence on database
         if(maybeSourceUser.isErr()) {
 
             AtomicReference<Throwable> cause = new AtomicReference<>();
             maybeSourceUser.fold(user -> user, throwable -> {
-                cause.set(throwable);
-                return throwable;
-            });
-
-            return Result.ofErr(new TransferErrorResult(transferInformation,
-                    new TransferException(
-                    "Invalid user information provided",
-                    HttpStatus.FORBIDDEN,
-                    TransferKnownStates.InvalidUserInformation,
-                    transferInformation,
-                    cause.get())));
-        }
-
-        else if(maybeDestinationUse.isErr()) {
-
-            AtomicReference<Throwable> cause = new AtomicReference<>();
-            maybeDestinationUse.fold(user -> user, throwable -> {
                 cause.set(throwable);
                 return throwable;
             });
@@ -84,9 +68,39 @@ public class TransferService {
                             cause.get())));
         }
 
+        else if(maybeDestinationUse.isErr()) {
+
+            AtomicReference<Throwable> cause = new AtomicReference<>();
+            maybeDestinationUse.fold(user -> user, throwable -> {
+                cause.set(throwable);
+                return throwable;
+            });
+
+            return Result.ofErr(new TransferErrorResult(
+                    transferInformation,
+                    new TransferException(
+                            "Invalid user information provided",
+                            HttpStatus.FORBIDDEN,
+                            TransferKnownStates.InvalidUserInformation,
+                            transferInformation,
+                            cause.get())));
+        }
+
+        if(!authorizationService.isAuthorized(maybeSourceUser.expect()))
+        {
+            return Result.ofErr(new TransferErrorResult(
+                    transferInformation,
+                    new TransferException(
+                            "Unauthorized user",
+                            HttpStatus.UNAUTHORIZED,
+                            TransferKnownStates.UnauthorizedUser,
+                            transferInformation)));
+        }
+
         // Validate if both user types can accept transfers between them
         if(userService.IsTransferEnabled(maybeSourceUser.expect().getUserType(), maybeDestinationUse.expect().getUserType(), KnownCurrencyOperations.Payment).isErr())
-            return Result.ofErr(new TransferErrorResult(transferInformation,
+            return Result.ofErr(new TransferErrorResult(
+                    transferInformation,
                     new TransferException(
                             "Transfer is not enabled for provided user types",
                             HttpStatus.FORBIDDEN,
@@ -95,7 +109,8 @@ public class TransferService {
 
         // TODO: Validate transfer source user currency value
         if(!this.ValidateTransferCurrencyAmount(transferInformation))
-            return Result.ofErr(new TransferErrorResult(transferInformation,
+            return Result.ofErr(new TransferErrorResult(
+                    transferInformation,
                     new TransferException(
                             "Transfer source user do not have the required value on account to complete the transfer",
                             HttpStatus.FORBIDDEN,

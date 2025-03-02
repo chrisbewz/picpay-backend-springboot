@@ -1,11 +1,10 @@
-package br.com.picpay.backend.services;
+package br.com.picpay.backend.controllers;
 
 import static org.mockito.Mockito.*;
 
 import br.com.picpay.backend.config.JacksonConfiguration;
 import br.com.picpay.backend.config.TestContainersConfiguration;
 import br.com.picpay.backend.config.TomcatTestConfiguration;
-import br.com.picpay.backend.controllers.TransferController;
 import br.com.picpay.backend.data.dtos.TransferInformation;
 import br.com.picpay.backend.data.dtos.TransferResult;
 import br.com.picpay.backend.data.entities.User;
@@ -13,6 +12,9 @@ import br.com.picpay.backend.data.enums.TransferKnownStates;
 import br.com.picpay.backend.data.enums.UserKnownTypes;
 import br.com.picpay.backend.data.repositories.UserRepository;
 import br.com.picpay.backend.exceptions.ApiErrorHandler;
+import br.com.picpay.backend.services.AuthorizationService;
+import br.com.picpay.backend.services.TransferService;
+import br.com.picpay.backend.services.UserService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -49,6 +51,9 @@ public class TransferControllerTests {
     private UserService userService;
 
     @Mock
+    private AuthorizationService authService;
+
+    @Mock
     private TransferService transferService;
 
 
@@ -68,7 +73,7 @@ public class TransferControllerTests {
 
         this.userRepository = Mockito.mock(UserRepository.class);
         this.userService = new UserService(userRepository);
-        this.transferService = new TransferService(userService);
+        this.transferService = new TransferService(userService, authService);
 
         this.mockMvc = MockMvcBuilders.standaloneSetup(new TransferController(this.transferService))
                 .setControllerAdvice(new ApiErrorHandler())
@@ -216,6 +221,48 @@ public class TransferControllerTests {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(transferInfo)))
                 .andExpect(MockMvcResultMatchers.status().isForbidden())
+                .andExpect(MockMvcResultMatchers.content().json(objectMapper.writeValueAsString(expectedResponse)));
+    }
+
+    @Test
+    void testUnauthorizedUserTransferShouldFail() throws Exception {
+
+        when(authService.isAuthorized(any(User.class))).thenReturn(false);
+
+        var transferInfo = new TransferInformation(
+                1L,
+                3L,
+                100.0);
+
+        var expectedResponse = new TransferResult(
+                transferInfo,
+                TransferKnownStates.UnauthorizedUser);
+
+        mockMvc.perform(MockMvcRequestBuilders.post("/transfer")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(transferInfo)))
+                .andExpect(MockMvcResultMatchers.status().isUnauthorized())
+                .andExpect(MockMvcResultMatchers.content().json(objectMapper.writeValueAsString(expectedResponse)));
+    }
+
+    @Test
+    void testUnauthorizedUserTransferShouldReturn200() throws Exception {
+
+        when(authService.isAuthorized(any(User.class))).thenReturn(true);
+
+        var transferInfo = new TransferInformation(
+                1L,
+                3L,
+                100.0);
+
+        var expectedResponse = new TransferResult(
+                transferInfo,
+                TransferKnownStates.Completed);
+
+        mockMvc.perform(MockMvcRequestBuilders.post("/transfer")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(transferInfo)))
+                .andExpect(MockMvcResultMatchers.status().isOk())
                 .andExpect(MockMvcResultMatchers.content().json(objectMapper.writeValueAsString(expectedResponse)));
     }
 }
