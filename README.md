@@ -39,7 +39,7 @@ High-level plan is represented in the table
 | Test Containers              | Completed ✔️ |
 | Transfer Endpoint Unit Tests | Completed ✔️ |
 | Transfers History            | WIP       👷 |
-| Transaction Support          | WIP       👷 |
+| Transaction Support          | Completed ✔️ |
 
 ## How to Run
 
