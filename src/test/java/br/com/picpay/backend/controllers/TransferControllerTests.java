@@ -5,6 +5,7 @@ import static org.mockito.Mockito.*;
 import br.com.picpay.backend.config.JacksonConfiguration;
 import br.com.picpay.backend.config.TestContainersConfiguration;
 import br.com.picpay.backend.config.TomcatTestConfiguration;
+import br.com.picpay.backend.config.WebFluxCustomConfig;
 import br.com.picpay.backend.data.dtos.TransferInformation;
 import br.com.picpay.backend.data.dtos.TransferResult;
 import br.com.picpay.backend.data.entities.User;
@@ -13,14 +14,15 @@ import br.com.picpay.backend.data.enums.UserKnownTypes;
 import br.com.picpay.backend.data.repositories.UserRepository;
 import br.com.picpay.backend.exceptions.ApiErrorHandler;
 import br.com.picpay.backend.services.AuthorizationService;
+import br.com.picpay.backend.services.NotificationService;
 import br.com.picpay.backend.services.TransferService;
 import br.com.picpay.backend.services.UserService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InjectMocks;
 import org.mockito.Mock;
-import org.mockito.Mockito;
 import org.mockito.MockitoAnnotations;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -33,6 +35,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders;
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
+import org.springframework.web.reactive.function.client.WebClient;
 
 @WebMvcTest(controllers = TransferController.class)
 @ExtendWith(MockitoExtension.class)
@@ -44,6 +47,8 @@ public class TransferControllerTests {
     @Autowired
     private ObjectMapper objectMapper;
 
+    @Autowired
+    private WebClient.Builder webClientBuilder;
     @Mock
     private UserRepository userRepository;
 
@@ -54,6 +59,9 @@ public class TransferControllerTests {
     private AuthorizationService authService;
 
     @Mock
+    private NotificationService notificationService;
+
+    @InjectMocks
     private TransferService transferService;
 
 
@@ -62,7 +70,9 @@ public class TransferControllerTests {
             JacksonConfiguration.class,
             TestContainersConfiguration.class,
             TomcatTestConfiguration.class,
+            WebFluxCustomConfig.class
     })
+    @ActiveProfiles("test")
     static class TransferControllerTestConfiguration {
     }
 
@@ -71,9 +81,12 @@ public class TransferControllerTests {
 
         MockitoAnnotations.openMocks(this);
 
-        this.userRepository = Mockito.mock(UserRepository.class);
+        reset(userRepository);
+
         this.userService = new UserService(userRepository);
-        this.transferService = new TransferService(userService, authService);
+        this.authService = new AuthorizationService(webClientBuilder);
+        this.notificationService = new NotificationService(webClientBuilder, this.userService);
+        this.transferService = new TransferService(userService, authService, notificationService);
 
         this.mockMvc = MockMvcBuilders.standaloneSetup(new TransferController(this.transferService))
                 .setControllerAdvice(new ApiErrorHandler())
@@ -112,6 +125,7 @@ public class TransferControllerTests {
         lenient().when(userRepository.findByUserName("test-user-2")).thenReturn(testUser2);
         lenient().when(userRepository.findByUserName("store-user-1")).thenReturn(testStoreUser1);
         lenient().when(userRepository.findByUserName("store-user-2")).thenReturn(testStoreUser2);
+
     }
 
     // Test Case 1: Valid transfer attempt (Customer -> Customer)

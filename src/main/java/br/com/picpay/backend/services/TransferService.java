@@ -7,7 +7,6 @@ import br.com.picpay.backend.data.entities.User;
 import br.com.picpay.backend.data.enums.KnownCurrencyOperations;
 import br.com.picpay.backend.data.enums.TransferKnownStates;
 import br.com.picpay.backend.exceptions.base.TransferException;
-import br.com.picpay.backend.exceptions.base.NotAuthorizedException;
 import br.com.picpay.backend.exceptions.custom.UserNotFoundException;
 import lombok.RequiredArgsConstructor;
 import net.xyzsd.dichotomy.Maybe;
@@ -27,6 +26,8 @@ public class TransferService {
     private final UserService userService;
 
     private final AuthorizationService authorizationService;
+
+    private final NotificationService notificationService;
 
     private Result<User, Throwable> fetchUserTask(Long userId) {
         var task = Try.wrap(() -> Maybe.of(userService.findByUserId(userId)));
@@ -118,7 +119,7 @@ public class TransferService {
                             transferInformation)));
 
         // Update users account currency total amounts
-        return this.UpdateCurrencyAmount(transferInformation);
+        return this.MaterializeTransfer(transferInformation);
     }
 
     private boolean ValidateTransferCurrencyAmount(@NotNull TransferInformation transferInformation) {
@@ -127,7 +128,7 @@ public class TransferService {
         return resultAmount > 0;
     }
 
-    private @NotNull Result<TransferResult, TransferErrorResult> UpdateCurrencyAmount(TransferInformation transferInformation)
+    private @NotNull Result<TransferResult, TransferErrorResult> MaterializeTransfer(TransferInformation transferInformation)
     {
         Result<TransferResult, TransferErrorResult> result = null;
         try{
@@ -146,6 +147,9 @@ public class TransferService {
                     });
 
             result =  Result.ofOK(new TransferResult(transferInformation, TransferKnownStates.Completed));
+
+            // Notify destination user about transfer conclusion
+            this.notificationService.notifyTransfer(userService.findByUserId(transferInformation.payee()));
         }
         catch (Exception e){
             result = Result.ofErr(new TransferErrorResult(transferInformation,new TransferException(e.getMessage(), TransferKnownStates.Canceled, transferInformation)));
