@@ -33,12 +33,13 @@ Issues can be addressed on [Issues](https://github.com/chrisbewz/picpay-backend-
 
 High-level plan is represented in the table
 
-| Feature           | Status       |
-|-------------------|--------------|
-| Transfers API     | Completed ✔️ |
-| Test Containers   | WIP       👷 |
-| Unit Tests        | WIP       👷 |
-| Transfers History | WIP       👷 |
+| Feature                      | Status       |
+|------------------------------|--------------|
+| Transfers API                | Completed ✔️ |
+| Test Containers              | Completed ✔️ |
+| Transfer Endpoint Unit Tests | Completed ✔️ |
+| Transfers History            | WIP       👷 |
+| Transaction Support          | WIP       👷 |
 
 ## How to Run
 
