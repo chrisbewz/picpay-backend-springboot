@@ -1,5 +1,6 @@
 package br.com.picpay.backend.services;
 
+import br.com.picpay.backend.data.entities.User;
 import br.com.picpay.backend.data.enums.KnownCurrencyOperations;
 import br.com.picpay.backend.data.enums.UserKnownTypes;
 import br.com.picpay.backend.data.repositories.UserRepository;
@@ -17,6 +18,7 @@ import java.util.EnumSet;
 public class UserService {
 
     private static final EnumMap<UserKnownTypes, EnumMap<UserKnownTypes, EnumSet<KnownCurrencyOperations>>> userOperationMap = new EnumMap<>(UserKnownTypes.class);
+
 
     private final UserRepository userRepository;
 
@@ -49,5 +51,15 @@ public class UserService {
         return Result.ofOK(true);
     }
 
+    public User saveUser(User user) {
+        return userRepository.save(user);
+    }
 
+    public User findByUserId(Long userId) {
+        return userRepository.findByUserId(userId);
+    }
+
+    public User findByUserName(String userName) {
+        return userRepository.findByUserName(userName);
+    }
 }

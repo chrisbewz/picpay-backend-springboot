@@ -1,85 +1,139 @@
 package br.com.picpay.backend.services;
 
+import br.com.picpay.backend.data.dtos.TransferErrorResult;
 import br.com.picpay.backend.data.dtos.TransferInformation;
 import br.com.picpay.backend.data.dtos.TransferResult;
+import br.com.picpay.backend.data.entities.User;
 import br.com.picpay.backend.data.enums.KnownCurrencyOperations;
 import br.com.picpay.backend.data.enums.TransferKnownStates;
+import br.com.picpay.backend.exceptions.base.CustomException;
 import br.com.picpay.backend.exceptions.base.TransferException;
-import br.com.picpay.backend.data.repositories.UserRepository;
+import br.com.picpay.backend.exceptions.custom.UserNotFoundException;
 import lombok.RequiredArgsConstructor;
 import net.xyzsd.dichotomy.Maybe;
 import net.xyzsd.dichotomy.Result;
+import net.xyzsd.dichotomy.trying.Try;
 import org.jetbrains.annotations.NotNull;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import java.util.Optional;
+import java.util.concurrent.atomic.AtomicReference;
 
 
 @Service
 @RequiredArgsConstructor
 public class TransferService {
 
-    private final UserRepository userRepository;
-
     private final UserService userService;
 
-    public Result<TransferResult, TransferException> TransferCurrency(@NotNull TransferInformation transferInformation) {
+    private Result<User, Throwable> fetchUserTask(Long userId) {
+        var task = Try.wrap(() -> Maybe.of(userService.findByUserId(userId)));
 
-        var maybeSourceUser = Maybe.of(userRepository.findByUserId(transferInformation.payer()));
-        var maybeDestinationUse = Maybe.of(userRepository.findByUserId(transferInformation.payee()));
+        if (task.isSuccess()) {
+            if(task.expect().hasSome())
+                return Result.ofOK(task.expect().expect());
+
+            return Result.ofErr(new UserNotFoundException("User with specified ID not found on database"));
+        }
+
+        AtomicReference<Result<User, Throwable>> errResult = new AtomicReference<>();
+        task.consumeErr(throwable -> {
+            errResult.set(Result.ofErr(throwable));
+        });
+        return errResult.get();
+    }
+
+    public Result<TransferResult, TransferErrorResult> TransferCurrency(@NotNull TransferInformation transferInformation) {
+
+        var maybeSourceUser = fetchUserTask(transferInformation.payer());
+        var maybeDestinationUse  = fetchUserTask(transferInformation.payee());
+
 
         // Validate both users existence on database
-        if(!maybeSourceUser.hasSome() || !maybeDestinationUse.hasSome())
-            return Result.ofErr(new TransferException(
-                    "Invalid user provided",
-                    TransferKnownStates.NonExistentUserId,
-                    transferInformation));
+        if(maybeSourceUser.isErr()) {
+
+            AtomicReference<Throwable> cause = new AtomicReference<>();
+            maybeSourceUser.fold(user -> user, throwable -> {
+                cause.set(throwable);
+                return throwable;
+            });
+
+            return Result.ofErr(new TransferErrorResult(transferInformation,
+                    new TransferException(
+                    "Invalid user information provided",
+                    HttpStatus.FORBIDDEN,
+                    TransferKnownStates.InvalidUserInformation,
+                    transferInformation,
+                    cause.get())));
+        }
+
+        else if(maybeDestinationUse.isErr()) {
+
+            AtomicReference<Throwable> cause = new AtomicReference<>();
+            maybeDestinationUse.fold(user -> user, throwable -> {
+                cause.set(throwable);
+                return throwable;
+            });
+
+            return Result.ofErr(new TransferErrorResult(transferInformation,
+                    new TransferException(
+                            "Invalid user information provided",
+                            HttpStatus.FORBIDDEN,
+                            TransferKnownStates.InvalidUserInformation,
+                            transferInformation,
+                            cause.get())));
+        }
 
         // Validate if both user types can accept transfers between them
         if(userService.IsTransferEnabled(maybeSourceUser.expect().getUserType(), maybeDestinationUse.expect().getUserType(), KnownCurrencyOperations.Payment).isErr())
-            return Result.ofErr(new TransferException(
-                    "Transfer is not enabled for provided user types",
-                    TransferKnownStates.InvalidUserKnownTypes,
-                    transferInformation));
+            return Result.ofErr(new TransferErrorResult(transferInformation,
+                    new TransferException(
+                            "Transfer is not enabled for provided user types",
+                            HttpStatus.FORBIDDEN,
+                            TransferKnownStates.InvalidUserKnownTypes,
+                            transferInformation)));
 
         // TODO: Validate transfer source user currency value
-        if(!Result.from(Optional.of(this.ValidateTransferCurrencyAmount(transferInformation))).isOK())
-            return Result.ofErr(new TransferException(
-                    "Transfer source user do not have the required value on account to complete the transfer",
-                    TransferKnownStates.InsufficientFunds,
-                    transferInformation));
+        if(!this.ValidateTransferCurrencyAmount(transferInformation))
+            return Result.ofErr(new TransferErrorResult(transferInformation,
+                    new TransferException(
+                            "Transfer source user do not have the required value on account to complete the transfer",
+                            HttpStatus.FORBIDDEN,
+                            TransferKnownStates.InsufficientFunds,
+                            transferInformation)));
 
         // Update users account currency total amounts
         return this.UpdateCurrencyAmount(transferInformation);
     }
 
     private boolean ValidateTransferCurrencyAmount(@NotNull TransferInformation transferInformation) {
-        var sourceUser = userRepository.findByUserId(transferInformation.payer());
-        Long resultAmount = Math.subtractExact(transferInformation.value().longValue(), sourceUser.getCurrencyAmount().longValue());
+        var sourceUser = userService.findByUserId(transferInformation.payer());
+        Long resultAmount = Math.subtractExact(sourceUser.getCurrencyAmount().longValue(), transferInformation.value().longValue());
         return resultAmount > 0;
     }
 
-    private @NotNull Result<TransferResult, TransferException> UpdateCurrencyAmount(TransferInformation transferInformation)
+    private @NotNull Result<TransferResult, TransferErrorResult> UpdateCurrencyAmount(TransferInformation transferInformation)
     {
-        Result<TransferResult, TransferException> result = null;
+        Result<TransferResult, TransferErrorResult> result = null;
         try{
             // No need to check for both users existence since this method is only intended to
             // be called if all previous checks on transfer currency method passes (including user checks)
-            Result.from(Optional.ofNullable(userRepository.findByUserId(transferInformation.payer())))
+            Result.from(Optional.ofNullable(userService.findByUserId(transferInformation.payer())))
                     .consume(user -> {
                         user.setCurrencyAmount(user.getCurrencyAmount() - transferInformation.value());
-                        userRepository.save(user);
+                        userService.saveUser(user);
                     });
 
-            Result.from(Optional.ofNullable(userRepository.findByUserId(transferInformation.payee())))
+            Result.from(Optional.ofNullable(userService.findByUserId(transferInformation.payee())))
                     .consume(user -> {
                         user.setCurrencyAmount(user.getCurrencyAmount() + transferInformation.value());
-                        userRepository.save(user);
+                        userService.saveUser(user);
                     });
 
             result =  Result.ofOK(new TransferResult(transferInformation, TransferKnownStates.Completed));
         }
         catch (Exception e){
-            result = Result.ofErr(new TransferException(e.getMessage(), TransferKnownStates.Faulted, transferInformation));
+            result = Result.ofErr(new TransferErrorResult(transferInformation,new TransferException(e.getMessage(), TransferKnownStates.Canceled, transferInformation)));
         }
 
         return result;
