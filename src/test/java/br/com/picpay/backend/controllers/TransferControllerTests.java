@@ -21,7 +21,6 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -35,11 +34,9 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders;
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
-import org.springframework.web.reactive.function.client.WebClient;
 
 @WebMvcTest(controllers = TransferController.class)
 @ExtendWith(MockitoExtension.class)
-@ActiveProfiles("test")
 public class TransferControllerTests {
 
     private MockMvc mockMvc;
@@ -47,8 +44,6 @@ public class TransferControllerTests {
     @Autowired
     private ObjectMapper objectMapper;
 
-    @Autowired
-    private WebClient.Builder webClientBuilder;
     @Mock
     private UserRepository userRepository;
 
@@ -61,9 +56,8 @@ public class TransferControllerTests {
     @Mock
     private NotificationService notificationService;
 
-    @InjectMocks
+    @Mock
     private TransferService transferService;
-
 
     @Configuration
     @Import({
@@ -73,7 +67,7 @@ public class TransferControllerTests {
             WebFluxCustomConfig.class
     })
     @ActiveProfiles("test")
-    static class TransferControllerTestConfiguration {
+    static class TransferTestsConfiguration{
     }
 
     @BeforeEach
@@ -84,11 +78,9 @@ public class TransferControllerTests {
         reset(userRepository);
 
         this.userService = new UserService(userRepository);
-        this.authService = new AuthorizationService(webClientBuilder);
-        this.notificationService = new NotificationService(webClientBuilder, this.userService);
         this.transferService = new TransferService(userService, authService, notificationService);
 
-        this.mockMvc = MockMvcBuilders.standaloneSetup(new TransferController(this.transferService))
+        this.mockMvc = MockMvcBuilders.standaloneSetup(new TransferController(transferService))
                 .setControllerAdvice(new ApiErrorHandler())
                 .build();
 
@@ -132,6 +124,8 @@ public class TransferControllerTests {
     @Test
     void testCustomerToCustomerTransferShouldReturn200() throws Exception {
 
+        lenient().when(authService.isAuthorized(any(User.class))).thenReturn(true);
+
         var transferInfo = new TransferInformation(
                 1L,
                 2L,
@@ -150,6 +144,9 @@ public class TransferControllerTests {
     // Test Case 2: Valid transfer attempt (Customer -> Store)
     @Test
     void testCustomerToStoreTransferShouldReturn200() throws Exception {
+
+        lenient().when(authService.isAuthorized(any(User.class))).thenReturn(true);
+
         var transferInfo = new TransferInformation(
                 1L,
                 3L,
@@ -168,6 +165,9 @@ public class TransferControllerTests {
     // Test Case 3: Invalid transfer attempt (Store -> Customer)
     @Test
     void testStoreToCustomerTransferShouldFail() throws Exception {
+
+        lenient().when(authService.isAuthorized(any(User.class))).thenReturn(true);
+
         var transferInfo = new TransferInformation(
                 3L,
                 1L,
@@ -186,6 +186,9 @@ public class TransferControllerTests {
     // Test Case 4: Invalid transfer attempt (Store -> Store)
     @Test
     void testStoreToStoreTransferShouldReturnFail() throws Exception {
+
+        lenient().when(authService.isAuthorized(any(User.class))).thenReturn(true);
+
         var transferInfo = new TransferInformation(
                 3L,
                 4L,
@@ -204,6 +207,9 @@ public class TransferControllerTests {
     // Test Case 5: Invalid transfer attempt (Insufficient Funds)
     @Test
     void testAnyUserTypeTransferWithInvalidAmountShouldFail() throws Exception {
+
+        lenient().when(authService.isAuthorized(any(User.class))).thenReturn(true);
+
         var transferInfo = new TransferInformation(
                 1L,
                 2L,
@@ -222,6 +228,9 @@ public class TransferControllerTests {
     // Test Case 6: Invalid transfer attempt (Unknown user)
     @Test
     void testUnknownUserTransferShouldFail() throws Exception {
+
+        lenient().when(authService.isAuthorized(any(User.class))).thenReturn(true);
+
         var transferInfo = new TransferInformation(
                 1L,
                 99L, /* Non-existing user sample id */
@@ -241,7 +250,7 @@ public class TransferControllerTests {
     @Test
     void testUnauthorizedUserTransferShouldFail() throws Exception {
 
-        when(authService.isAuthorized(any(User.class))).thenReturn(false);
+        lenient().when(authService.isAuthorized(any(User.class))).thenReturn(false);
 
         var transferInfo = new TransferInformation(
                 1L,
@@ -256,27 +265,6 @@ public class TransferControllerTests {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(transferInfo)))
                 .andExpect(MockMvcResultMatchers.status().isUnauthorized())
-                .andExpect(MockMvcResultMatchers.content().json(objectMapper.writeValueAsString(expectedResponse)));
-    }
-
-    @Test
-    void testUnauthorizedUserTransferShouldReturn200() throws Exception {
-
-        when(authService.isAuthorized(any(User.class))).thenReturn(true);
-
-        var transferInfo = new TransferInformation(
-                1L,
-                3L,
-                100.0);
-
-        var expectedResponse = new TransferResult(
-                transferInfo,
-                TransferKnownStates.Completed);
-
-        mockMvc.perform(MockMvcRequestBuilders.post("/transfer")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(transferInfo)))
-                .andExpect(MockMvcResultMatchers.status().isOk())
                 .andExpect(MockMvcResultMatchers.content().json(objectMapper.writeValueAsString(expectedResponse)));
     }
 }
